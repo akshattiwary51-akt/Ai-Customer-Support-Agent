@@ -1,0 +1,32 @@
+# Feature Checklist
+
+- [x] Repository audit
+- [x] Implementation plan
+- [x] FastAPI backend
+- [x] Local auth
+- [x] Role-based access control
+- [x] Seeded customers, orders, payments, tickets, and policy docs
+- [x] Order lookup tool
+- [x] Payment status tool
+- [x] Refund eligibility tool
+- [x] Refund request workflow
+- [x] Cancellation workflow through chat and direct API
+- [x] Ticket creation and agent inbox APIs
+- [x] Knowledge indexing and search APIs
+- [x] Persistent conversations and messages
+- [x] Ordered orchestration endpoint matching User -> LangGraph -> LangChain -> Evaluator -> Response/Retry
+- [x] Backend graph nodes/edges for the architecture diagram
+- [x] Frontend ordered-flow panel with clickable diagram blocks and backend trace results
+- [x] Feedback endpoint
+- [x] Analytics endpoint
+- [x] Health/readiness endpoints
+- [x] Core backend tests
+- [x] Expanded acceptance tests for cancellation, abstention, prompt-injection ownership checks, and upload RBAC
+- [x] Docker Compose
+- [x] CI workflow
+- [ ] Backend-connected frontend pages
+- [ ] True token streaming
+- [ ] Alembic production migrations
+- [ ] Redis rate limiting
+- [ ] pgvector/embedding provider adapter
+- [ ] Optional MCP adapter

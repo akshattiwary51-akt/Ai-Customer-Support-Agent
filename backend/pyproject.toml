@@ -5,7 +5,7 @@ description = "Production-style AI customer support backend with auth, RAG, tool
 requires-python = ">=3.11"
 dependencies = [
   "alembic==1.14.0",
-  "fastapi==0.115.6",
+  "fastapi==0.143.3",
   "uvicorn[standard]==0.34.0",
   "sqlalchemy==2.0.36",
   "pydantic==2.10.4",

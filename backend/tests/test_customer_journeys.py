@@ -1,7 +1,31 @@
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 from fastapi.testclient import TestClient
 
+import app.main as app_module
 from app.db.seed import reset_and_seed
 from app.main import app
+
+
+def test_app_lifespan_initializes_database_when_enabled(monkeypatch):
+    settings = SimpleNamespace(
+        app_name="test",
+        allowed_origins=[],
+        api_prefix="/api/v1",
+        auto_create_tables=True,
+    )
+    create_tables = Mock()
+    seed = Mock()
+    monkeypatch.setattr(app_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(app_module.Base.metadata, "create_all", create_tables)
+    monkeypatch.setattr(app_module, "seed_if_empty", seed)
+
+    with TestClient(app_module.create_app()):
+        pass
+
+    create_tables.assert_called_once_with(bind=app_module.engine)
+    seed.assert_called_once_with()
 
 
 def auth_headers(client: TestClient, email: str = "customer@example.com") -> dict[str, str]:

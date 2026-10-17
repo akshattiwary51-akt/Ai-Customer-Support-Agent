@@ -204,6 +204,16 @@ class ToolResult(BaseModel):
     error: str | None = None
 
 
+class AgentStep(BaseModel):
+    """One reason/act/observe iteration of the ReAct loop."""
+
+    step: int
+    thought: str | None = None
+    tool_name: str | None = None
+    tool_input: dict[str, Any] | None = None
+    observation: dict[str, Any] | None = None
+
+
 class ChatResponse(BaseModel):
     conversation_id: int
     user_message: MessageRead
@@ -211,6 +221,8 @@ class ChatResponse(BaseModel):
     intent: IntentResult
     tool_results: list[ToolResult]
     escalation_required: bool
+    engine: Literal["agent", "deterministic"] = "deterministic"
+    agent_trace: list[AgentStep] = []
 
 
 class OrchestrationRequest(BaseModel):

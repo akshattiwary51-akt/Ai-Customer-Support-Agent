@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     retrieval_min_score: float = 0.08
     refund_window_days: int = 30
     rate_limit_per_minute: int = 120
+    # ReAct agent. The agent engine is only used when a key is configured;
+    # otherwise chat falls back to the deterministic router.
+    agent_enabled: bool = True
+    anthropic_api_key: str | None = None
+    agent_model: str = "claude-sonnet-5-5"
+    agent_max_steps: int = 6
+    agent_max_tokens: int = 1024
+    agent_timeout_seconds: float = 30.0
+    agent_history_messages: int = 10
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -1,10 +1,12 @@
 import json
+import logging
 import time
 
 from sqlalchemy.orm import Session
 
 from app.models import Conversation, Message, User
 from app.schemas import ChatResponse, MessageRead, ToolResult
+from app.services.agent_service import run_agent
 from app.services.business_service import (
     cancel_order,
     create_refund_request,
@@ -15,6 +17,9 @@ from app.services.business_service import (
 )
 from app.services.intent_service import classify_intent, extract_order_number
 from app.services.knowledge_service import search_knowledge
+from app.services.llm_client import LLMError, get_llm_client
+
+logger = logging.getLogger(__name__)
 
 
 def _message_read(message: Message) -> MessageRead:
@@ -39,6 +44,14 @@ def get_or_create_conversation(db: Session, user: User, conversation_id: int | N
     return conversation
 
 
+def _store_user_message(db: Session, conversation: Conversation, message_text: str) -> Message:
+    user_message = Message(conversation_id=conversation.id, role="user", content=message_text)
+    db.add(user_message)
+    db.commit()
+    db.refresh(user_message)
+    return user_message
+
+
 def respond_to_chat(
     db: Session,
     user: User,
@@ -47,12 +60,79 @@ def respond_to_chat(
     confirm_action: bool = False,
     idempotency_key: str | None = None,
 ) -> ChatResponse:
-    intent = classify_intent(message_text)
+    """Answer a customer message.
+
+    Uses the ReAct agent when an LLM provider is configured. Without one (or if the
+    provider fails before any tool ran) it falls back to the deterministic router.
+    """
+    llm = get_llm_client()
+    if llm is None:
+        return _respond_deterministic(
+            db, user, message_text, conversation_id, confirm_action, idempotency_key
+        )
+
     conversation = get_or_create_conversation(db, user, conversation_id, message_text[:70])
-    user_message = Message(conversation_id=conversation.id, role="user", content=message_text)
-    db.add(user_message)
+    user_message = _store_user_message(db, conversation, message_text)
+    try:
+        result = run_agent(
+            db,
+            user,
+            llm,
+            conversation_id=conversation.id,
+            user_message_id=user_message.id,
+            confirm_action=confirm_action,
+            idempotency_key=idempotency_key,
+        )
+    except LLMError:
+        logger.warning("LLM provider failed before any tool ran; using deterministic fallback")
+        return _respond_deterministic(
+            db,
+            user,
+            message_text,
+            conversation_id,
+            confirm_action,
+            idempotency_key,
+            conversation=conversation,
+            user_message=user_message,
+        )
+
+    assistant_message = Message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content=result.response,
+        citations_json=json.dumps([citation.model_dump() for citation in result.citations]),
+    )
+    db.add(assistant_message)
     db.commit()
+    db.refresh(assistant_message)
     db.refresh(user_message)
+
+    return ChatResponse(
+        conversation_id=conversation.id,
+        user_message=_message_read(user_message),
+        assistant_message=_message_read(assistant_message),
+        intent=result.intent,
+        tool_results=result.tool_results,
+        escalation_required=result.escalation_required,
+        engine="agent",
+        agent_trace=result.trace,
+    )
+
+
+def _respond_deterministic(
+    db: Session,
+    user: User,
+    message_text: str,
+    conversation_id: int | None = None,
+    confirm_action: bool = False,
+    idempotency_key: str | None = None,
+    conversation: Conversation | None = None,
+    user_message: Message | None = None,
+) -> ChatResponse:
+    intent = classify_intent(message_text)
+    if conversation is None or user_message is None:
+        conversation = get_or_create_conversation(db, user, conversation_id, message_text[:70])
+        user_message = _store_user_message(db, conversation, message_text)
 
     tool_results: list[ToolResult] = []
     citations = []
